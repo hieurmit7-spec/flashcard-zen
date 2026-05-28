@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
-import { decksStore } from "@/lib/decks-store";
+import { fetchDecks, fetchDueCardsByDeck, reviewCard, type Deck } from "@/lib/flashcards-api";
 
 export const Route = createFileRoute("/study/$deckId")({
   head: () => ({
@@ -22,20 +22,54 @@ function NotFound() {
 function StudyPage() {
   const { deckId } = Route.useParams();
   const navigate = useNavigate();
-  const deck = decksStore.getDeck(deckId);
+  const [deck, setDeck] = useState<Deck | null>(null);
+  const [cards, setCards] = useState<Array<{ id: string; front: string; back: string; tags: string[]; images: string[] }>>([]);
+  const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [done, setDone] = useState(false);
 
-  const cards = useMemo(() => deck?.cards ?? [], [deck]);
-
-  if (!deck) return <NotFound />;
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        const decks = await fetchDecks();
+        const d = decks.find((x) => x.id === deckId) ?? null;
+        if (!alive) return;
+        setDeck(d);
+        if (!d) return;
+        const due = await fetchDueCardsByDeck(deckId);
+        if (!alive) return;
+        setCards(
+          due.map((c) => ({
+            id: c.id,
+            front: c.front_content,
+            back: c.back_content,
+            tags: [],
+            images: (c.images ?? []).map((img) => img.image_url),
+          }))
+        );
+      } catch (e) {
+        if (!alive) return;
+        setError(e instanceof Error ? e.message : "Không tải được dữ liệu học");
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, [deckId]);
 
   const total = cards.length;
   const card = cards[index];
   const progress = total === 0 ? 0 : ((index + (flipped ? 0.5 : 0)) / total) * 100;
 
-  const grade = (_g: "again" | "hard" | "good" | "easy") => {
+  const grade = async (g: "again" | "hard" | "good" | "easy") => {
+    try {
+      if (card) await reviewCard(card.id, g);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không lưu được kết quả ôn tập");
+    }
     if (index + 1 >= total) {
       setDone(true);
       return;
@@ -43,6 +77,39 @@ function StudyPage() {
     setFlipped(false);
     setIndex((i) => i + 1);
   };
+
+  useEffect(() => {
+    if (!card?.front || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(card.front);
+    utterance.lang = "en-US";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return () => window.speechSynthesis.cancel();
+  }, [card?.id]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        navigate({ to: "/" });
+        return;
+      }
+      if (e.key === " ") {
+        e.preventDefault();
+        if (!flipped) setFlipped(true);
+        return;
+      }
+      if (!flipped) return;
+      if (e.key === "1") void grade("again");
+      if (e.key === "2") void grade("hard");
+      if (e.key === "3") void grade("good");
+      if (e.key === "4") void grade("easy");
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [flipped, card?.id, index, total, navigate]);
+
+  if (!deck) return <NotFound />;
 
   if (done) {
     return (
@@ -54,7 +121,7 @@ function StudyPage() {
           </div>
           <h1 className="mt-6 text-3xl font-semibold tracking-tight">Hoàn thành!</h1>
           <p className="mt-2 text-muted-foreground">
-            Bạn đã ôn xong {total} thẻ trong "{deck.name}".
+            Bạn đã ôn xong {total} thẻ trong "{deck.title}".
           </p>
           <Link
             to="/"
@@ -66,6 +133,28 @@ function StudyPage() {
       </div>
     );
   }
+
+  if (total === 0 || !card) {
+    return (
+      <div className="min-h-screen bg-background">
+        <TopBar onBack={() => navigate({ to: "/" })} current={0} total={0} progress={0} />
+        <main className="mx-auto flex max-w-2xl flex-col items-center justify-center px-4 py-24 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight">Chưa có thẻ cần ôn</h1>
+          <p className="mt-2 text-muted-foreground">Hãy quay lại Dashboard hoặc thêm thẻ mới.</p>
+          <Link
+            to="/"
+            className="mt-8 inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Về Dashboard
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  const parts = card.back.split(" — ");
+  const viMeaning = parts[parts.length - 1] ?? card.back;
+  const enMeaning = parts.slice(0, -1).join(" — ");
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,9 +191,27 @@ function StudyPage() {
                   <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Mặt sau
                   </span>
-                  <p className="mt-4 text-xl leading-relaxed text-foreground sm:text-2xl">
-                    {card.back}
+                  <p className="mt-4 text-3xl font-semibold leading-relaxed text-foreground sm:text-4xl">
+                    {viMeaning}
                   </p>
+                  {enMeaning && (
+                    <p className="mt-3 text-base leading-relaxed text-muted-foreground sm:text-lg">
+                      {enMeaning}
+                    </p>
+                  )}
+                  {card.images.length > 0 && (
+                    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {card.images.map((src) => (
+                        <img
+                          key={src}
+                          src={src}
+                          alt={card.front}
+                          loading="lazy"
+                          className="h-24 w-full rounded-lg object-cover border border-border"
+                        />
+                      ))}
+                    </div>
+                  )}
                   {card.tags.length > 0 && (
                     <div className="mt-6 flex flex-wrap justify-center gap-2">
                       {card.tags.map((t) => (

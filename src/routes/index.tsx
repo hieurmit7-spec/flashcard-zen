@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Play, Settings2, BookOpen, Sparkles } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
-import { decksStore, countDue, countLearning, countNew } from "@/lib/decks-store";
+import { fetchDecks, fetchDueCardsByDeck, type Deck } from "@/lib/flashcards-api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -14,8 +15,32 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const decks = decksStore.get();
-  const totalDue = decks.reduce((s, d) => s + countDue(d), 0);
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [dueMap, setDueMap] = useState<Record<string, number>>({});
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        const rows = await fetchDecks();
+        if (!alive) return;
+        setDecks(rows);
+        const entries = await Promise.all(rows.map(async (d) => [d.id, (await fetchDueCardsByDeck(d.id)).length] as const));
+        if (!alive) return;
+        setDueMap(Object.fromEntries(entries));
+      } catch (e) {
+        if (!alive) return;
+        setError(e instanceof Error ? e.message : "Không tải được dữ liệu");
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const totalDue = Object.values(dueMap).reduce((s, n) => s + n, 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -36,9 +61,9 @@ function Dashboard() {
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {decks.map((deck) => {
-            const due = countDue(deck);
-            const learning = countLearning(deck);
-            const fresh = countNew(deck);
+            const due = dueMap[deck.id] ?? 0;
+            const learning = 0;
+            const fresh = 0;
             return (
               <article
                 key={deck.id}
@@ -64,17 +89,35 @@ function Dashboard() {
                 <div className="mt-5 flex items-center gap-4 text-sm">
                   <Stat label="Cần ôn" value={due} color="due" />
                   <Stat label="Đang học" value={learning} color="learning" />
-                  <Stat label="Mới" value={fresh} color="muted" />
+                  <Stat label="Đã học" value={fresh} color="muted" />
                 </div>
 
-                <Link
-                  to="/study/$deckId"
-                  params={{ deckId: deck.id }}
-                  className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                >
-                  <Play className="h-4 w-4 fill-current" />
-                  Học ngay
-                </Link>
+                <div className="mt-6 grid grid-cols-1 gap-2">
+                  <Link
+                    to="/study/$deckId"
+                    params={{ deckId: deck.id }}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    <Play className="h-4 w-4 fill-current" />
+                    Học ngay
+                  </Link>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link
+                      to="/memory-match/$deckId"
+                      params={{ deckId: deck.id }}
+                      className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent"
+                    >
+                      Memory Match
+                    </Link>
+                    <Link
+                      to="/cryptogram/$deckId"
+                      params={{ deckId: deck.id }}
+                      className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent"
+                    >
+                      Cryptogram
+                    </Link>
+                  </div>
+                </div>
               </article>
             );
           })}

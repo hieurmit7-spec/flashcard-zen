@@ -20,6 +20,12 @@ export function AppHeader() {
             Bộ bài
           </Link>
           <Link
+            to="/dictionary"
+            className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&.active]:text-foreground"
+          >
+            Từ điển
+          </Link>
+          <Link
             to="/new"
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >

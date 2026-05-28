@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:unit-1-sigma.vercel.app)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node *)",
+      "Bash(npx supabase *)",
+      "Bash(SUPABASE_ACCESS_TOKEN='7emlMk4xZGraIdlgcK/AoUJaqIdelNj3Ov7X5pplxUVGtkuiEbqmsoKM843w3tAgpWSSese6TlEDzlUwVst6hQ==' npx supabase *)"
+    ]
+  }
+}

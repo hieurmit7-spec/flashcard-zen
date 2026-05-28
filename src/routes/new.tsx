@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
-import { decksStore } from "@/lib/decks-store";
+import { createCard, fetchDecks, type Deck } from "@/lib/flashcards-api";
 
 export const Route = createFileRoute("/new")({
   head: () => ({
@@ -13,24 +13,51 @@ export const Route = createFileRoute("/new")({
 
 function NewCard() {
   const navigate = useNavigate();
-  const decks = decksStore.get();
-  const [deckId, setDeckId] = useState(decks[0]?.id ?? "");
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [deckId, setDeckId] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      try {
+        const rows = await fetchDecks();
+        if (!alive) return;
+        setDecks(rows);
+        setDeckId(rows[0]?.id ?? "");
+      } catch (e) {
+        if (!alive) return;
+        setError(e instanceof Error ? e.message : "Không tải được bộ bài");
+      }
+    };
+    void run();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") navigate({ to: "/" });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [navigate]);
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [tags, setTags] = useState("");
   const [saved, setSaved] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!front.trim() || !back.trim()) return;
-    decksStore.addCard(
-      deckId,
-      front.trim(),
-      back.trim(),
-      tags.split(",").map((t) => t.trim()).filter(Boolean)
-    );
-    setSaved(true);
-    setTimeout(() => navigate({ to: "/" }), 600);
+    if (!front.trim() || !back.trim() || !deckId) return;
+    try {
+      await createCard(deckId, front.trim(), back.trim());
+      setSaved(true);
+      setTimeout(() => navigate({ to: "/" }), 600);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Lưu thẻ thất bại");
+    }
   };
 
   return (
@@ -39,6 +66,7 @@ function NewCard() {
       <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
         <header className="mb-8">
           <h1 className="text-3xl font-semibold tracking-tight">Thêm thẻ mới</h1>
+          {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
           <p className="mt-1.5 text-muted-foreground">
             Soạn một thẻ flashcard mới và thêm vào bộ bài.
           </p>

@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as NewRouteImport } from './routes/new'
+import { Route as DictionaryRouteImport } from './routes/dictionary'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudyDeckIdRouteImport } from './routes/study.$deckId'
+import { Route as MemoryMatchDeckIdRouteImport } from './routes/memory-match.$deckId'
+import { Route as CryptogramDeckIdRouteImport } from './routes/cryptogram.$deckId'
 
 const NewRoute = NewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DictionaryRoute = DictionaryRouteImport.update({
+  id: '/dictionary',
+  path: '/dictionary',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -28,34 +36,75 @@ const StudyDeckIdRoute = StudyDeckIdRouteImport.update({
   path: '/study/$deckId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MemoryMatchDeckIdRoute = MemoryMatchDeckIdRouteImport.update({
+  id: '/memory-match/$deckId',
+  path: '/memory-match/$deckId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CryptogramDeckIdRoute = CryptogramDeckIdRouteImport.update({
+  id: '/cryptogram/$deckId',
+  path: '/cryptogram/$deckId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dictionary': typeof DictionaryRoute
   '/new': typeof NewRoute
+  '/cryptogram/$deckId': typeof CryptogramDeckIdRoute
+  '/memory-match/$deckId': typeof MemoryMatchDeckIdRoute
   '/study/$deckId': typeof StudyDeckIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dictionary': typeof DictionaryRoute
   '/new': typeof NewRoute
+  '/cryptogram/$deckId': typeof CryptogramDeckIdRoute
+  '/memory-match/$deckId': typeof MemoryMatchDeckIdRoute
   '/study/$deckId': typeof StudyDeckIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dictionary': typeof DictionaryRoute
   '/new': typeof NewRoute
+  '/cryptogram/$deckId': typeof CryptogramDeckIdRoute
+  '/memory-match/$deckId': typeof MemoryMatchDeckIdRoute
   '/study/$deckId': typeof StudyDeckIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/new' | '/study/$deckId'
+  fullPaths:
+    | '/'
+    | '/dictionary'
+    | '/new'
+    | '/cryptogram/$deckId'
+    | '/memory-match/$deckId'
+    | '/study/$deckId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/new' | '/study/$deckId'
-  id: '__root__' | '/' | '/new' | '/study/$deckId'
+  to:
+    | '/'
+    | '/dictionary'
+    | '/new'
+    | '/cryptogram/$deckId'
+    | '/memory-match/$deckId'
+    | '/study/$deckId'
+  id:
+    | '__root__'
+    | '/'
+    | '/dictionary'
+    | '/new'
+    | '/cryptogram/$deckId'
+    | '/memory-match/$deckId'
+    | '/study/$deckId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DictionaryRoute: typeof DictionaryRoute
   NewRoute: typeof NewRoute
+  CryptogramDeckIdRoute: typeof CryptogramDeckIdRoute
+  MemoryMatchDeckIdRoute: typeof MemoryMatchDeckIdRoute
   StudyDeckIdRoute: typeof StudyDeckIdRoute
 }
 
@@ -66,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof NewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dictionary': {
+      id: '/dictionary'
+      path: '/dictionary'
+      fullPath: '/dictionary'
+      preLoaderRoute: typeof DictionaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -82,14 +138,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudyDeckIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/memory-match/$deckId': {
+      id: '/memory-match/$deckId'
+      path: '/memory-match/$deckId'
+      fullPath: '/memory-match/$deckId'
+      preLoaderRoute: typeof MemoryMatchDeckIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cryptogram/$deckId': {
+      id: '/cryptogram/$deckId'
+      path: '/cryptogram/$deckId'
+      fullPath: '/cryptogram/$deckId'
+      preLoaderRoute: typeof CryptogramDeckIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DictionaryRoute: DictionaryRoute,
   NewRoute: NewRoute,
+  CryptogramDeckIdRoute: CryptogramDeckIdRoute,
+  MemoryMatchDeckIdRoute: MemoryMatchDeckIdRoute,
   StudyDeckIdRoute: StudyDeckIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
